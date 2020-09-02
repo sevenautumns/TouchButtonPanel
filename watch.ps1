@@ -1,0 +1,1 @@
+cargo watch -x clippy -c
