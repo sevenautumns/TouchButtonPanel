@@ -3,6 +3,7 @@
 #![no_std]
 
 mod hid;
+mod models;
 mod touch_button_panel;
 
 use panic_semihosting as _;
@@ -15,18 +16,20 @@ pub use rtic::{
 #[macro_use(block)]
 use nb::block;
 
-use at42qt1070::Key::*;
+use models::*;
+
 use at42qt1070::*;
+use embedded_hal::digital::v2::{InputPin, OutputPin};
 use stm32f4xx_hal::gpio::{
     gpioa::*, gpiob::*, gpioc::*, AlternateOD, Edge, ExtiPin, Input, OpenDrain, Output, PullUp,
-    PushPull, AF4, AF9,
+    AF4, AF9,
 };
 use stm32f4xx_hal::i2c::*;
 use stm32f4xx_hal::interrupt::*;
 use stm32f4xx_hal::otg_fs::{UsbBusType, USB};
 use stm32f4xx_hal::prelude::*;
 use stm32f4xx_hal::stm32;
-use stm32f4xx_hal::stm32::{I2C1, I2C2, I2C3};
+use stm32f4xx_hal::stm32::{EXTI, I2C1, I2C2, I2C3};
 use stm32f4xx_hal::timer;
 use usb_device::bus::UsbBusAllocator;
 use usb_device::class::UsbClass as _;
@@ -56,24 +59,28 @@ type TouchSensor3 = TouchSensor<
     PA0<Input<PullUp>>,
 >;
 
-pub struct TouchSensor<I2C, CLK, SDA, RESET, CHANGE> {
-    pub sensor: At42qt1070<I2c<I2C, (CLK, SDA)>>,
-    pub reset: RESET,
-    pub change_interrupt: CHANGE,
-}
+type HardwareButtons = Buttons<
+    PA5<Input<PullUp>>,
+    PA6<Input<PullUp>>,
+    PA7<Input<PullUp>>,
+    PA9<Input<PullUp>>,
+    PA10<Input<PullUp>>,
+    PA13<Input<PullUp>>,
+    PA14<Input<PullUp>>,
+    PA15<Input<PullUp>>,
+>;
 
-#[app(device = stm32f4xx_hal::stm32, peripherals = true)]
+#[app(device = stm32f4xx_hal::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
     struct Resources {
-        led_1: PA5<Output<PushPull>>,
-        led_2: PA6<Output<PushPull>>,
-        led_3: PA7<Output<PushPull>>,
         timer: timer::Timer<stm32::TIM3>,
         usb_device: UsbTouchButtonPanelDevice,
         usb_class: UsbTouchButtonPanelClass,
         sensor_one: TouchSensor1,
         sensor_two: TouchSensor2,
         sensor_three: TouchSensor3,
+        buttons: HardwareButtons,
+        exti: EXTI,
     }
 
     #[init]
@@ -81,7 +88,7 @@ const APP: () = {
         static mut EP_MEMORY: [u32; 1024] = [0; 1024];
         static mut USB_BUS: Option<UsbBusAllocator<UsbBusType>> = None;
 
-        //Time Measurement
+        //Enable Time Measurement
         c.core.DWT.enable_cycle_counter();
         c.core.DCB.enable_trace();
 
@@ -89,10 +96,6 @@ const APP: () = {
         let gpioa = c.device.GPIOA.split();
         let gpiob = c.device.GPIOB.split();
         let gpioc = c.device.GPIOC.split();
-
-        let mut led_1 = gpioa.pa5.into_push_pull_output();
-        let mut led_2 = gpioa.pa6.into_push_pull_output();
-        let mut led_3 = gpioa.pa7.into_push_pull_output();
 
         let clocks = rcc
             .cfgr
@@ -226,16 +229,62 @@ const APP: () = {
         //let mut timer = timer::Timer::tim3(c.device.TIM3, 1.khz(), clocks);
         //Use previously created timer to trigger TIM3 Interrupt every milli second
         timer.listen(timer::Event::TimeOut);
+
+        //// Button Part
+        let state: u8 = 0;
+        let mut button_0 = gpioa.pa5.into_pull_up_input();
+        button_0.make_interrupt_source(&mut syscfg);
+        button_0.enable_interrupt(&mut exti);
+        button_0.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_1 = gpioa.pa6.into_pull_up_input();
+        button_1.make_interrupt_source(&mut syscfg);
+        button_1.enable_interrupt(&mut exti);
+        button_1.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_2 = gpioa.pa7.into_pull_up_input();
+        button_2.make_interrupt_source(&mut syscfg);
+        button_2.enable_interrupt(&mut exti);
+        button_2.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_3 = gpioa.pa9.into_pull_up_input();
+        button_3.make_interrupt_source(&mut syscfg);
+        button_3.enable_interrupt(&mut exti);
+        button_3.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_4 = gpioa.pa10.into_pull_up_input();
+        button_4.make_interrupt_source(&mut syscfg);
+        button_4.enable_interrupt(&mut exti);
+        button_4.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_5 = gpioa.pa13.into_pull_up_input();
+        button_5.make_interrupt_source(&mut syscfg);
+        button_5.enable_interrupt(&mut exti);
+        button_5.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_6 = gpioa.pa14.into_pull_up_input();
+        button_6.make_interrupt_source(&mut syscfg);
+        button_6.enable_interrupt(&mut exti);
+        button_6.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let mut button_7 = gpioa.pa15.into_pull_up_input();
+        button_7.make_interrupt_source(&mut syscfg);
+        button_7.enable_interrupt(&mut exti);
+        button_7.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
+        let buttons = HardwareButtons {
+            button_0,
+            button_1,
+            button_2,
+            button_3,
+            button_4,
+            button_5,
+            button_6,
+            button_7,
+            state,
+        };
+
         init::LateResources {
-            led_1,
-            led_2,
-            led_3,
             timer,
             usb_device,
             usb_class,
             sensor_one,
             sensor_two,
             sensor_three,
+            buttons,
+            exti,
         }
     }
 
@@ -246,6 +295,86 @@ const APP: () = {
     //     iprintln!(stim, "EXTI4 {:?}", resources.EXTI.pr.read().pr13().bit());
     //     resources.EXTI.pr.modify(|_, w| w.pr13().set_bit());
     // }
+
+    #[task(binds = EXTI9_5, resources = [buttons, exti], schedule=[debounce])]
+    fn button9_5_interrupt(mut c: button9_5_interrupt::Context) {
+        let buttons: &mut HardwareButtons = &mut c.resources.buttons;
+        let exti = &mut c.resources.exti;
+        let pr = exti.pr.read();
+        let mut due: u8 = 0;
+
+        if pr.pr5().bit_is_set() {
+            bit_set(&mut due, 0);
+        }
+
+        if pr.pr6().bit_is_set() {
+            bit_set(&mut due, 1);
+        }
+
+        if pr.pr7().bit_is_set() {
+            bit_set(&mut due, 2);
+        }
+
+        if pr.pr9().bit_is_set() {
+            bit_set(&mut due, 3);
+        }
+
+        for i in 0..4 {
+            if bit_check(due, i) {
+                buttons.set_interrupt_enabled(i, exti);
+                buttons.clear_pending_interrupt_bit(i);
+                buttons.read_to_status(i);
+
+                c.schedule
+                    .debounce(Instant::now() + 840_000.cycles(), i as u8)
+                    .unwrap();
+            }
+        }
+    }
+
+    #[task(binds = EXTI15_10, resources = [buttons, exti], schedule=[debounce])]
+    fn button15_10_interrupt(mut c: button15_10_interrupt::Context) {
+        let buttons: &mut HardwareButtons = &mut c.resources.buttons;
+        let exti = &mut c.resources.exti;
+        let pr = exti.pr.read();
+        let mut due: u8 = 0;
+
+        if pr.pr10().bit_is_set() {
+            bit_set(&mut due, 4);
+        }
+
+        if pr.pr11().bit_is_set() {
+            bit_set(&mut due, 5);
+        }
+
+        if pr.pr12().bit_is_set() {
+            bit_set(&mut due, 6);
+        }
+
+        if pr.pr13().bit_is_set() {
+            bit_set(&mut due, 7);
+        }
+
+        for i in 4..8 {
+            if bit_check(due, i) {
+                buttons.set_interrupt_enabled(i, exti);
+                buttons.clear_pending_interrupt_bit(i);
+                buttons.read_to_status(i);
+
+                c.schedule
+                    .debounce(Instant::now() + 840_000.cycles(), i as u8)
+                    .unwrap();
+            }
+        }
+    }
+
+    #[task(resources = [buttons, exti], capacity = 8)]
+    fn debounce(mut c: debounce::Context, btn: u8) {
+        let buttons: &mut HardwareButtons = &mut c.resources.buttons;
+
+        buttons.set_interrupt_enabled(btn, c.resources.exti);
+        buttons.read_to_status(btn);
+    }
 
     #[task(binds = EXTI2, resources = [sensor_one])]
     fn interrupt_sensor_one(c: interrupt_sensor_one::Context) {
@@ -307,7 +436,7 @@ const APP: () = {
             .unwrap();
     }
 
-    #[task(binds = TIM3, resources = [usb_class, sensor_one, sensor_two, sensor_three, timer])]
+    #[task(binds = TIM3, resources = [usb_class, sensor_one, sensor_two, sensor_three, timer, buttons])]
     fn report(c: report::Context) {
         c.resources.timer.clear_interrupt(timer::Event::TimeOut);
         let one = c.resources.sensor_one.sensor.read_cached_full_key_status();
@@ -317,9 +446,9 @@ const APP: () = {
             .sensor_three
             .sensor
             .read_cached_full_key_status();
-        c.resources
-            .usb_class
-            .write(&key_status_to_report(one, two, three));
+        let mut report = key_status_to_report(one, two, three);
+        report[0] = c.resources.buttons.state;
+        c.resources.usb_class.write(&report);
     }
 
     #[task(binds = OTG_FS, resources = [usb_device, usb_class])]
@@ -331,6 +460,10 @@ const APP: () = {
     fn usb_rx(mut c: usb_rx::Context) {
         usb_poll(&mut c.resources.usb_device, &mut c.resources.usb_class);
     }
+
+    extern "C" {
+        fn SDIO();
+    }
 };
 
 fn usb_poll(
@@ -340,6 +473,14 @@ fn usb_poll(
     if usb_device.poll(&mut [touch_panel]) {
         touch_panel.poll();
     }
+}
+
+fn bit_check(byte: u8, n: u8) -> bool {
+    (byte >> n) & 1 == 1
+}
+
+fn bit_set(byte: &mut u8, n: u8) {
+    *byte |= 1 << n;
 }
 
 fn key_status_to_report(one: [bool; 7], two: [bool; 7], three: [bool; 7]) -> [u8; 4] {
