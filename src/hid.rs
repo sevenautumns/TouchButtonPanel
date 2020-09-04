@@ -2,22 +2,22 @@
 use usb_device::class_prelude::*;
 use usb_device::Result;
 
-pub const USB_CLASS_HID: u8 = 0x03;
+//pub const USB_CLASS_HID: u8 = 0x03;
 
-const USB_SUBCLASS_NONE: u8 = 0x00;
-const USB_SUBCLASS_BOOT: u8 = 0x01;
+//const USB_SUBCLASS_NONE: u8 = 0x00;
+//const USB_SUBCLASS_BOOT: u8 = 0x01;
 
-const USB_INTERFACE_NONE: u8 = 0x00;
-const USB_INTERFACE_KEYBOARD: u8 = 0x01;
-const USB_INTERFACE_MOUSE: u8 = 0x02;
-const USB_INTERFACE_GAMEPAD: u8 = 0x05;
+//const USB_INTERFACE_NONE: u8 = 0x00;
+//const USB_INTERFACE_KEYBOARD: u8 = 0x01;
+//const USB_INTERFACE_MOUSE: u8 = 0x02;
+//const USB_INTERFACE_GAMEPAD: u8 = 0x05;
 
-const REQ_GET_REPORT: u8 = 0x01;
-const REQ_GET_IDLE: u8 = 0x02;
-const REQ_GET_PROTOCOL: u8 = 0x03;
-const REQ_SET_REPORT: u8 = 0x09;
-const REQ_SET_IDLE: u8 = 0x0a;
-const REQ_SET_PROTOCOL: u8 = 0x0b;
+//const REQ_GET_REPORT: u8 = 0x01;
+//const REQ_GET_IDLE: u8 = 0x02;
+//const REQ_GET_PROTOCOL: u8 = 0x03;
+//const REQ_SET_REPORT: u8 = 0x09;
+//const REQ_SET_IDLE: u8 = 0x0a;
+//const REQ_SET_PROTOCOL: u8 = 0x0b;
 
 const REPORT_DESCR: &[u8] = &[
     0x05, 0x01, // USAGE_PAGE (Generic Desktop)
@@ -26,34 +26,10 @@ const REPORT_DESCR: &[u8] = &[
     0xa1, 0x00, //   COLLECTION (Physical)
     0x05, 0x09, //     USAGE_PAGE (Button)
     0x19, 0x01, //     USAGE_MINIMUM (Button 1)
-    0x29, 0x08, //     USAGE_MAXIMUM (Button 8)
-    0x15, 0x00, //     LOGICAL_MINIMUM (0)
-    0x25, 0x01, //     LOGICAL_MAXIMUM (1)
-    0x95, 0x08, //     REPORT_COUNT (8)
-    0x75, 0x01, //     REPORT_SIZE (1)
-    0x81, 0x02, //     INPUT (Data,Var,Abs)
-    0x05, 0x09, //     USAGE_PAGE (Button)
-    0x19, 0x09, //     USAGE_MINIMUM (Button 9)
-    0x29, 0x10, //     USAGE_MAXIMUM (Button 16)
-    0x15, 0x00, //     LOGICAL_MINIMUM (0)
-    0x25, 0x01, //     LOGICAL_MAXIMUM (1)
-    0x95, 0x08, //     REPORT_COUNT (8)
-    0x75, 0x01, //     REPORT_SIZE (1)
-    0x81, 0x02, //     INPUT (Data,Var,Abs)
-    0x05, 0x09, //     USAGE_PAGE (Button)
-    0x19, 0x11, //     USAGE_MINIMUM (Button 17)
-    0x29, 0x18, //     USAGE_MAXIMUM (Button 24)
-    0x15, 0x00, //     LOGICAL_MINIMUM (0)
-    0x25, 0x01, //     LOGICAL_MAXIMUM (1)
-    0x95, 0x08, //     REPORT_COUNT (8)
-    0x75, 0x01, //     REPORT_SIZE (1)
-    0x81, 0x02, //     INPUT (Data,Var,Abs)
-    0x05, 0x09, //     USAGE_PAGE (Button)
-    0x19, 0x19, //     USAGE_MINIMUM (Button 25)
     0x29, 0x19, //     USAGE_MAXIMUM (Button 25)
     0x15, 0x00, //     LOGICAL_MINIMUM (0)
     0x25, 0x01, //     LOGICAL_MAXIMUM (1)
-    0x95, 0x01, //     REPORT_COUNT (1)
+    0x95, 0x19, //     REPORT_COUNT (25)
     0x75, 0x01, //     REPORT_SIZE (1)
     0x81, 0x02, //     INPUT (Data,Var,Abs)
     0x95, 0x01, //     REPORT_COUNT (1)
@@ -62,28 +38,6 @@ const REPORT_DESCR: &[u8] = &[
     0xc0, //   END_COLLECTION
     0xc0, // END_COLLECTION
 ];
-
-pub fn report(
-    hardware_buttons: u8,
-    outer_buttons: u8,
-    inner_buttons: u8,
-    center_button: bool,
-) -> [u8; 4] {
-    let center_buttons = {
-        if center_button {
-            1 << 7 as u8
-        } else {
-            0 as u8
-        }
-    };
-
-    [
-        hardware_buttons,
-        outer_buttons,
-        inner_buttons,
-        center_buttons,
-    ]
-}
 
 pub struct HIDClass<'a, B: UsbBus> {
     report_if: InterfaceNumber,
@@ -107,9 +61,9 @@ impl<B: UsbBus> UsbClass<B> for HIDClass<'_, B> {
     fn get_configuration_descriptors(&self, writer: &mut DescriptorWriter) -> Result<()> {
         writer.interface(
             self.report_if,
-            USB_CLASS_HID,
-            USB_SUBCLASS_NONE,
-            USB_INTERFACE_GAMEPAD,
+            0x03, // USB_CLASS_HID
+            0x00, // USB_SUBCLASS_NONE
+            0x05, //USB_INTERFACE_GAMEPAD
         )?;
 
         let descr_len: u16 = REPORT_DESCR.len() as u16;
@@ -196,10 +150,10 @@ impl<B: UsbBus> UsbClass<B> for HIDClass<'_, B> {
         }
 
         match req.request {
-            REQ_GET_REPORT => {
+            0x01 => {   // REQ_GET_REPORT
                 // USB host requests for report
                 // I'm not sure what we should do here, so just send an empty report
-                xfer.accept_with(&report(0, 0, 0, false)).ok();
+                xfer.accept_with(&[0, 0, 0, 0]).ok();
             }
             _ => {
                 //Pass request on

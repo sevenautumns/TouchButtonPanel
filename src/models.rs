@@ -56,62 +56,62 @@ impl<
         match button {
             0 => {
                 if enable {
-                    self.button_0.disable_interrupt(exti)
-                } else {
                     self.button_0.enable_interrupt(exti)
+                } else {
+                    self.button_0.disable_interrupt(exti)
                 }
             }
             1 => {
                 if enable {
-                    self.button_1.disable_interrupt(exti)
-                } else {
                     self.button_1.enable_interrupt(exti)
+                } else {
+                    self.button_1.disable_interrupt(exti)
                 }
             }
             2 => {
                 if enable {
-                    self.button_2.disable_interrupt(exti)
-                } else {
                     self.button_2.enable_interrupt(exti)
+                } else {
+                    self.button_2.disable_interrupt(exti)
                 }
             }
             3 => {
                 if enable {
-                    self.button_3.disable_interrupt(exti)
-                } else {
                     self.button_3.enable_interrupt(exti)
+                } else {
+                    self.button_3.disable_interrupt(exti)
                 }
             }
             4 => {
                 if enable {
-                    self.button_4.disable_interrupt(exti)
-                } else {
                     self.button_4.enable_interrupt(exti)
+                } else {
+                    self.button_4.disable_interrupt(exti)
                 }
             }
             5 => {
                 if enable {
-                    self.button_5.disable_interrupt(exti)
-                } else {
                     self.button_5.enable_interrupt(exti)
+                } else {
+                    self.button_5.disable_interrupt(exti)
                 }
             }
             6 => {
                 if enable {
-                    self.button_6.disable_interrupt(exti)
-                } else {
                     self.button_6.enable_interrupt(exti)
+                } else {
+                    self.button_6.disable_interrupt(exti)
                 }
             }
             7 => {
                 if enable {
-                    self.button_7.disable_interrupt(exti)
-                } else {
                     self.button_7.enable_interrupt(exti)
+                } else {
+                    self.button_7.disable_interrupt(exti)
                 }
             }
 
-            _ => {},
+            _ => {}
         }
     }
 
@@ -125,7 +125,7 @@ impl<
             5 => self.button_5.clear_interrupt_pending_bit(),
             6 => self.button_6.clear_interrupt_pending_bit(),
             7 => self.button_7.clear_interrupt_pending_bit(),
-            _ => {},
+            _ => {}
         }
     }
 

@@ -13,7 +13,6 @@ pub use rtic::{
     cyccnt::{Instant, U32Ext},
 };
 
-#[macro_use(block)]
 use nb::block;
 
 use models::*;
@@ -60,13 +59,13 @@ type TouchSensor3 = TouchSensor<
 >;
 
 type HardwareButtons = Buttons<
+    PA3<Input<PullUp>>,
+    PA4<Input<PullUp>>,
     PA5<Input<PullUp>>,
     PA6<Input<PullUp>>,
     PA7<Input<PullUp>>,
     PA9<Input<PullUp>>,
     PA10<Input<PullUp>>,
-    PA13<Input<PullUp>>,
-    PA14<Input<PullUp>>,
     PA15<Input<PullUp>>,
 >;
 
@@ -232,31 +231,31 @@ const APP: () = {
 
         //// Button Part
         let state: u8 = 0;
-        let mut button_0 = gpioa.pa5.into_pull_up_input();
+        let mut button_0 = gpioa.pa3.into_pull_up_input();
         button_0.make_interrupt_source(&mut syscfg);
         button_0.enable_interrupt(&mut exti);
         button_0.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_1 = gpioa.pa6.into_pull_up_input();
+        let mut button_1 = gpioa.pa4.into_pull_up_input();
         button_1.make_interrupt_source(&mut syscfg);
         button_1.enable_interrupt(&mut exti);
         button_1.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_2 = gpioa.pa7.into_pull_up_input();
+        let mut button_2 = gpioa.pa5.into_pull_up_input();
         button_2.make_interrupt_source(&mut syscfg);
         button_2.enable_interrupt(&mut exti);
         button_2.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_3 = gpioa.pa9.into_pull_up_input();
+        let mut button_3 = gpioa.pa6.into_pull_up_input();
         button_3.make_interrupt_source(&mut syscfg);
         button_3.enable_interrupt(&mut exti);
         button_3.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_4 = gpioa.pa10.into_pull_up_input();
+        let mut button_4 = gpioa.pa7.into_pull_up_input();
         button_4.make_interrupt_source(&mut syscfg);
         button_4.enable_interrupt(&mut exti);
         button_4.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_5 = gpioa.pa13.into_pull_up_input();
+        let mut button_5 = gpioa.pa9.into_pull_up_input();
         button_5.make_interrupt_source(&mut syscfg);
         button_5.enable_interrupt(&mut exti);
         button_5.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
-        let mut button_6 = gpioa.pa14.into_pull_up_input();
+        let mut button_6 = gpioa.pa10.into_pull_up_input();
         button_6.make_interrupt_source(&mut syscfg);
         button_6.enable_interrupt(&mut exti);
         button_6.trigger_on_edge(&mut exti, Edge::RISING_FALLING);
@@ -296,6 +295,34 @@ const APP: () = {
     //     resources.EXTI.pr.modify(|_, w| w.pr13().set_bit());
     // }
 
+    #[task(binds = EXTI3, resources = [buttons, exti], schedule=[debounce])]
+    fn button3_interrupt(mut c: button3_interrupt::Context) {
+        let buttons: &mut HardwareButtons = &mut c.resources.buttons;
+        let exti = &mut c.resources.exti;
+
+        buttons.set_interrupt_disabled(0, exti);
+        buttons.clear_pending_interrupt_bit(0);
+        buttons.read_to_status(0);
+
+        c.schedule
+            .debounce(Instant::now() + 840_000.cycles(), 0 as u8)
+            .unwrap();
+    }
+
+    #[task(binds = EXTI4, resources = [buttons, exti], schedule=[debounce])]
+    fn button4_interrupt(mut c: button4_interrupt::Context) {
+        let buttons: &mut HardwareButtons = &mut c.resources.buttons;
+        let exti = &mut c.resources.exti;
+
+        buttons.set_interrupt_disabled(1, exti);
+        buttons.clear_pending_interrupt_bit(1);
+        buttons.read_to_status(1);
+
+        c.schedule
+            .debounce(Instant::now() + 840_000.cycles(), 1 as u8)
+            .unwrap();
+    }
+
     #[task(binds = EXTI9_5, resources = [buttons, exti], schedule=[debounce])]
     fn button9_5_interrupt(mut c: button9_5_interrupt::Context) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
@@ -304,24 +331,24 @@ const APP: () = {
         let mut due: u8 = 0;
 
         if pr.pr5().bit_is_set() {
-            bit_set(&mut due, 0);
-        }
-
-        if pr.pr6().bit_is_set() {
-            bit_set(&mut due, 1);
-        }
-
-        if pr.pr7().bit_is_set() {
             bit_set(&mut due, 2);
         }
 
-        if pr.pr9().bit_is_set() {
+        if pr.pr6().bit_is_set() {
             bit_set(&mut due, 3);
         }
 
-        for i in 0..4 {
+        if pr.pr7().bit_is_set() {
+            bit_set(&mut due, 4);
+        }
+
+        if pr.pr9().bit_is_set() {
+            bit_set(&mut due, 5);
+        }
+
+        for i in 2..6 {
             if bit_check(due, i) {
-                buttons.set_interrupt_enabled(i, exti);
+                buttons.set_interrupt_disabled(i, exti);
                 buttons.clear_pending_interrupt_bit(i);
                 buttons.read_to_status(i);
 
@@ -340,24 +367,16 @@ const APP: () = {
         let mut due: u8 = 0;
 
         if pr.pr10().bit_is_set() {
-            bit_set(&mut due, 4);
-        }
-
-        if pr.pr11().bit_is_set() {
-            bit_set(&mut due, 5);
-        }
-
-        if pr.pr12().bit_is_set() {
             bit_set(&mut due, 6);
         }
 
-        if pr.pr13().bit_is_set() {
+        if pr.pr15().bit_is_set() {
             bit_set(&mut due, 7);
         }
 
-        for i in 4..8 {
+        for i in 6..8 {
             if bit_check(due, i) {
-                buttons.set_interrupt_enabled(i, exti);
+                buttons.set_interrupt_disabled(i, exti);
                 buttons.clear_pending_interrupt_bit(i);
                 buttons.read_to_status(i);
 
@@ -462,6 +481,7 @@ const APP: () = {
     }
 
     extern "C" {
+        //Any free Interrupt which is used for the Debounce Software Task
         fn SDIO();
     }
 };
