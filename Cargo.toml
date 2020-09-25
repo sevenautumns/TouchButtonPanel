@@ -4,16 +4,14 @@ version = "0.1.0"
 authors = ["Sven Friedrich <friedrich122112@googlemail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-stm32f4xx-hal = { version = "0.7.0", features = ["rt", "stm32f401", "usb_fs"] }
-cortex-m = "0.6"
-cortex-m-rt = { version = "0.6.10", features = ["device"] }
+stm32f4xx-hal = { version = "0.8.3", features = ["rt", "stm32f401", "usb_fs"] }
+cortex-m = "0.6.3"
+cortex-m-rt = { version = "0.6.12", features = ["device"] }
 panic-halt = "0.2.0"
-cortex-m-rtic = "0.5"
-embedded-hal = "0.2"
-usb-device = "0.2.0"
-at42qt1070 = "0.1.0"
-nb = "0.1.2"
+cortex-m-rtic = "0.5.5"
+embedded-hal = "0.2.4"
+usb-device = "0.2.5"
+at42qt1070 = "0.1.1"
+nb = "1.0.0"
 panic-semihosting = "0.5.3"

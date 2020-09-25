@@ -2,23 +2,6 @@
 use usb_device::class_prelude::*;
 use usb_device::Result;
 
-//pub const USB_CLASS_HID: u8 = 0x03;
-
-//const USB_SUBCLASS_NONE: u8 = 0x00;
-//const USB_SUBCLASS_BOOT: u8 = 0x01;
-
-//const USB_INTERFACE_NONE: u8 = 0x00;
-//const USB_INTERFACE_KEYBOARD: u8 = 0x01;
-//const USB_INTERFACE_MOUSE: u8 = 0x02;
-//const USB_INTERFACE_GAMEPAD: u8 = 0x05;
-
-//const REQ_GET_REPORT: u8 = 0x01;
-//const REQ_GET_IDLE: u8 = 0x02;
-//const REQ_GET_PROTOCOL: u8 = 0x03;
-//const REQ_SET_REPORT: u8 = 0x09;
-//const REQ_SET_IDLE: u8 = 0x0a;
-//const REQ_SET_PROTOCOL: u8 = 0x0b;
-
 const REPORT_DESCR: &[u8] = &[
     0x05, 0x01, // USAGE_PAGE (Generic Desktop)
     0x09, 0x05, // USAGE (Game Pad)
@@ -150,9 +133,10 @@ impl<B: UsbBus> UsbClass<B> for HIDClass<'_, B> {
         }
 
         match req.request {
-            0x01 => {   // REQ_GET_REPORT
+            0x01 => {
+                // REQ_GET_REPORT
                 // USB host requests for report
-                // I'm not sure what we should do here, so just send an empty report
+                // Just send an empty report
                 xfer.accept_with(&[0, 0, 0, 0]).ok();
             }
             _ => {
@@ -161,4 +145,31 @@ impl<B: UsbBus> UsbClass<B> for HIDClass<'_, B> {
             }
         }
     }
+}
+
+pub fn key_status_to_report(one: [bool; 7], two: [bool; 7], three: [bool; 7]) -> [u8; 4] {
+    let mut shift = 0;
+    let mut index = 1;
+    let mut report = [0 as u8; 4];
+    for keys in &[one, two, three] {
+        for s in keys {
+            if *s {
+                report[index] += 1 << shift;
+            }
+            if shift == 7 {
+                // If shift is already 7, reset it to 0 and increase the index
+                index += 1;
+                shift = 0;
+            } else {
+                // Else just increase shift by 1
+                shift += 1;
+            }
+            if shift == 1 && index == 3 {
+                //If last relevant button was processed
+                break;
+            }
+        }
+    }
+
+    report
 }

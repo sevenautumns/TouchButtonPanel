@@ -5,8 +5,13 @@ use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::i2c::*;
 use stm32f4xx_hal::stm32::EXTI;
 
-pub struct TouchSensor<I2C, SCL: PinScl<I2C>, SDA: PinSda<I2C>, RESET: OutputPin, CHANGE: InputPin>
-{
+pub struct TouchSensor<
+    I2C,
+    SCL: PinScl<I2C>,
+    SDA: PinSda<I2C>,
+    RESET: OutputPin,
+    CHANGE: InputPin + ExtiPin,
+> {
     pub sensor: At42qt1070<I2c<I2C, (SCL, SDA)>>,
     pub reset: RESET,
     pub change_interrupt: CHANGE,
@@ -129,7 +134,23 @@ impl<
         }
     }
 
-    pub fn read_to_status(&mut self, button: u8) {
+    pub fn set_cached_button_status(&mut self, button: u8, value: bool) {
+        if value {
+            bit_set(&mut self.state, button);
+        } else {
+            bit_clear(&mut self.state, button);
+        }
+    }
+
+    pub fn get_cached_button_status(&self, button: u8) -> bool {
+        bit_check(self.state, button)
+    }
+
+    pub fn toggle_cached_button_status(&mut self, button: u8) {
+        bit_toggle(&mut self.state, button)
+    }
+
+    pub fn update_button_status(&mut self, button: u8) {
         let set = match button {
             0 => self.button_0.is_low().unwrap(),
             1 => self.button_1.is_low().unwrap(),
@@ -142,10 +163,22 @@ impl<
             _ => return,
         };
 
-        if set {
-            self.state |= 1 << button;
-        } else {
-            self.state &= !(1 << button);
-        }
+        self.set_cached_button_status(button, set);
     }
+}
+
+pub fn bit_check(byte: u8, n: u8) -> bool {
+    (byte >> n) & 1 == 1
+}
+
+pub fn bit_set(byte: &mut u8, n: u8) {
+    *byte |= 1 << n;
+}
+
+pub fn bit_clear(byte: &mut u8, n: u8) {
+    *byte &= !(1 << n);
+}
+
+pub fn bit_toggle(byte: &mut u8, n: u8) {
+    *byte ^= 1 << n;
 }

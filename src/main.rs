@@ -4,7 +4,6 @@
 
 mod hid;
 mod models;
-mod touch_button_panel;
 
 use panic_semihosting as _;
 
@@ -16,6 +15,8 @@ pub use rtic::{
 use nb::block;
 
 use models::*;
+
+use hid::*;
 
 use at42qt1070::*;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
@@ -31,10 +32,11 @@ use stm32f4xx_hal::stm32;
 use stm32f4xx_hal::stm32::{EXTI, I2C1, I2C2, I2C3};
 use stm32f4xx_hal::timer;
 use usb_device::bus::UsbBusAllocator;
-use usb_device::class::UsbClass as _;
+use usb_device::prelude::*;
+//use usb_device::class::UsbClass as _;
 
-type UsbTouchButtonPanelDevice = touch_button_panel::Device<'static, UsbBusType>;
-type UsbTouchButtonPanelClass = touch_button_panel::Class<'static, UsbBusType>;
+type UsbTouchButtonPanelDevice = UsbDevice<'static, UsbBusType>;
+type UsbTouchButtonPanelClass = HIDClass<'static, UsbBusType>;
 
 type TouchSensor1 = TouchSensor<
     I2C1,
@@ -115,8 +117,14 @@ const APP: () = {
         *USB_BUS = Some(UsbBusType::new(usb, EP_MEMORY));
         let usb_bus = USB_BUS.as_ref().unwrap();
 
-        let usb_class = touch_button_panel::new_class(usb_bus);
-        let usb_device = touch_button_panel::new_device(usb_bus);
+        let usb_class = HIDClass::new(usb_bus);
+        // https://github.com/obdev/v-usb/blob/master/usbdrv/USB-IDs-for-free.txt
+        // For USB Joystick as there is no USB Game Pad on this free ID list
+        let usb_device = UsbDeviceBuilder::new(usb_bus, UsbVidPid(0x16c0, 0x27dc))
+            .manufacturer("autumnal.de")
+            .product("Touch Button Panel")
+            .serial_number(env!("CARGO_PKG_VERSION"))
+            .build();
 
         //Initialize Interrupt Input
         let mut syscfg = c.device.SYSCFG;
@@ -206,6 +214,7 @@ const APP: () = {
             }
         }
 
+        // Initial interrupt set
         rtic::pend(EXTI0);
         rtic::pend(EXTI1);
         rtic::pend(EXTI2);
@@ -287,14 +296,7 @@ const APP: () = {
         }
     }
 
-    // #[interrupt(resources = [ITM, EXTI])]
-    // fn EXTI15_10(){
-    //     let stim = &mut resources.ITM.stim[0];
-    //     iprintln!(stim, "EXTI4 {:?}", resources.EXTI.pr.read().pr12().bit());
-    //     iprintln!(stim, "EXTI4 {:?}", resources.EXTI.pr.read().pr13().bit());
-    //     resources.EXTI.pr.modify(|_, w| w.pr13().set_bit());
-    // }
-
+    // Interrupt for Button0
     #[task(binds = EXTI3, resources = [buttons, exti], schedule=[debounce])]
     fn button3_interrupt(mut c: button3_interrupt::Context) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
@@ -302,13 +304,14 @@ const APP: () = {
 
         buttons.set_interrupt_disabled(0, exti);
         buttons.clear_pending_interrupt_bit(0);
-        buttons.read_to_status(0);
+        buttons.toggle_cached_button_status(0);
 
         c.schedule
             .debounce(Instant::now() + 840_000.cycles(), 0 as u8)
             .unwrap();
     }
 
+    // Interrupt for Button1
     #[task(binds = EXTI4, resources = [buttons, exti], schedule=[debounce])]
     fn button4_interrupt(mut c: button4_interrupt::Context) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
@@ -316,13 +319,14 @@ const APP: () = {
 
         buttons.set_interrupt_disabled(1, exti);
         buttons.clear_pending_interrupt_bit(1);
-        buttons.read_to_status(1);
+        buttons.toggle_cached_button_status(1);
 
         c.schedule
             .debounce(Instant::now() + 840_000.cycles(), 1 as u8)
             .unwrap();
     }
 
+    // Interrupt for Button2 - Button5
     #[task(binds = EXTI9_5, resources = [buttons, exti], schedule=[debounce])]
     fn button9_5_interrupt(mut c: button9_5_interrupt::Context) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
@@ -350,7 +354,7 @@ const APP: () = {
             if bit_check(due, i) {
                 buttons.set_interrupt_disabled(i, exti);
                 buttons.clear_pending_interrupt_bit(i);
-                buttons.read_to_status(i);
+                buttons.toggle_cached_button_status(i);
 
                 c.schedule
                     .debounce(Instant::now() + 840_000.cycles(), i as u8)
@@ -359,6 +363,7 @@ const APP: () = {
         }
     }
 
+    // Interrupt for Button6 - Button7
     #[task(binds = EXTI15_10, resources = [buttons, exti], schedule=[debounce])]
     fn button15_10_interrupt(mut c: button15_10_interrupt::Context) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
@@ -378,7 +383,7 @@ const APP: () = {
             if bit_check(due, i) {
                 buttons.set_interrupt_disabled(i, exti);
                 buttons.clear_pending_interrupt_bit(i);
-                buttons.read_to_status(i);
+                buttons.toggle_cached_button_status(i);
 
                 c.schedule
                     .debounce(Instant::now() + 840_000.cycles(), i as u8)
@@ -387,14 +392,16 @@ const APP: () = {
         }
     }
 
+    // Debouncer; Reactivates Interrupt and reads current status
     #[task(resources = [buttons, exti], capacity = 8)]
     fn debounce(mut c: debounce::Context, btn: u8) {
         let buttons: &mut HardwareButtons = &mut c.resources.buttons;
 
         buttons.set_interrupt_enabled(btn, c.resources.exti);
-        buttons.read_to_status(btn);
+        buttons.update_button_status(btn);
     }
 
+    // Interrupt for Sensor1
     #[task(binds = EXTI2, resources = [sensor_one])]
     fn interrupt_sensor_one(c: interrupt_sensor_one::Context) {
         c.resources
@@ -415,6 +422,7 @@ const APP: () = {
             .unwrap();
     }
 
+    // Interrupt for Sensor2
     #[task(binds = EXTI1, resources = [sensor_two])]
     fn interrupt_sensor_two(c: interrupt_sensor_two::Context) {
         c.resources
@@ -435,6 +443,7 @@ const APP: () = {
             .unwrap();
     }
 
+    // Interrupt for Sensor3
     #[task(binds = EXTI0, resources = [sensor_three])]
     fn interrupt_sensor_three(c: interrupt_sensor_three::Context) {
         c.resources
@@ -455,27 +464,28 @@ const APP: () = {
             .unwrap();
     }
 
+    // Periodic status update to Computer (every millisecond)
     #[task(binds = TIM3, resources = [usb_class, sensor_one, sensor_two, sensor_three, timer, buttons])]
-    fn report(c: report::Context) {
+    fn report(mut c: report::Context) {
         c.resources.timer.clear_interrupt(timer::Event::TimeOut);
         let one = c.resources.sensor_one.sensor.read_cached_full_key_status();
         let two = c.resources.sensor_two.sensor.read_cached_full_key_status();
-        let three = c
-            .resources
-            .sensor_three
-            .sensor
-            .read_cached_full_key_status();
+        let three = c.resources.sensor_three.sensor.read_cached_full_key_status();
         let mut report = key_status_to_report(one, two, three);
         report[0] = c.resources.buttons.state;
-        c.resources.usb_class.write(&report);
+
+        //Lock usb_class object and report
+        c.resources.usb_class.lock(|class| class.write(&report));
     }
 
-    #[task(binds = OTG_FS, resources = [usb_device, usb_class])]
+    // Global USB Interrupt (does not include Wakeup)
+    #[task(binds = OTG_FS, resources = [usb_device, usb_class], priority = 2)]
     fn usb_tx(mut c: usb_tx::Context) {
         usb_poll(&mut c.resources.usb_device, &mut c.resources.usb_class);
     }
 
-    #[task(binds = OTG_FS_WKUP, resources = [usb_device, usb_class])]
+    // Interrupt for USB Wakeup
+    #[task(binds = OTG_FS_WKUP, resources = [usb_device, usb_class], priority = 2)]
     fn usb_rx(mut c: usb_rx::Context) {
         usb_poll(&mut c.resources.usb_device, &mut c.resources.usb_class);
     }
@@ -490,42 +500,5 @@ fn usb_poll(
     usb_device: &mut UsbTouchButtonPanelDevice,
     touch_panel: &mut UsbTouchButtonPanelClass,
 ) {
-    if usb_device.poll(&mut [touch_panel]) {
-        touch_panel.poll();
-    }
-}
-
-fn bit_check(byte: u8, n: u8) -> bool {
-    (byte >> n) & 1 == 1
-}
-
-fn bit_set(byte: &mut u8, n: u8) {
-    *byte |= 1 << n;
-}
-
-fn key_status_to_report(one: [bool; 7], two: [bool; 7], three: [bool; 7]) -> [u8; 4] {
-    let mut shift = 0;
-    let mut index = 1;
-    let mut report = [0 as u8; 4];
-    for keys in &[one, two, three] {
-        for s in keys {
-            if *s {
-                report[index] += 1 << shift;
-            }
-            if shift == 7 {
-                // If shift is already 7, reset it to 0 and increase the index
-                index += 1;
-                shift = 0;
-            } else {
-                // Else just increase shift by 1
-                shift += 1;
-            }
-            if shift == 1 && index == 3 {
-                //If last relevant button was processed
-                break;
-            }
-        }
-    }
-
-    report
+    usb_device.poll(&mut [touch_panel]);
 }
