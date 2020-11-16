@@ -33,7 +33,6 @@ use stm32f4xx_hal::stm32::{EXTI, I2C1, I2C2, I2C3};
 use stm32f4xx_hal::timer;
 use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
-//use usb_device::class::UsbClass as _;
 
 type UsbTouchButtonPanelDevice = UsbDevice<'static, UsbBusType>;
 type UsbTouchButtonPanelClass = HIDClass<'static, UsbBusType>;
@@ -70,6 +69,11 @@ type HardwareButtons = Buttons<
     PA10<Input<PullUp>>,
     PA15<Input<PullUp>>,
 >;
+
+//Thresholds for Touch Fields
+const THRESHOLD: [u8; 17] = [140, 140, 140, 140, 140, 140, 140, 140,
+                            120, 120, 120, 120, 120, 120, 120, 120,
+                           120];
 
 #[app(device = stm32f4xx_hal::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
@@ -219,14 +223,18 @@ const APP: () = {
         rtic::pend(EXTI1);
         rtic::pend(EXTI2);
 
+
+
         //Initialize sensors
         sensor_one.sensor.sync_all().unwrap();
         sensor_two.sensor.sync_all().unwrap();
         sensor_three.sensor.sync_all().unwrap();
 
-        //sensor_one.sensor.set_negative_threshold(100, Key1).unwrap();
-        //sensor_two.sensor.set_negative_threshold(100, Key1).unwrap();
-        //sensor_three.sensor.set_negative_threshold(100, Key1).unwrap();
+        //Remove Max on Duration
+        sensor_one.sensor.set_max_on_duration(None).unwrap();
+        sensor_two.sensor.set_max_on_duration(None).unwrap();
+        sensor_three.sensor.set_max_on_duration(None).unwrap();
+
         //Set AKS to 0 for all Keys, so they are not Grouped
         for i in 0..7 {
             sensor_one.sensor.set_aks(0, Key::from(i)).unwrap();
@@ -234,7 +242,21 @@ const APP: () = {
             sensor_three.sensor.set_aks(0, Key::from(i)).unwrap();
         }
 
-        //let mut timer = timer::Timer::tim3(c.device.TIM3, 1.khz(), clocks);
+        //Load Threshold defined in const value
+        let mut i = 0;
+        for k in 0..7{
+            sensor_one.sensor.set_negative_threshold(THRESHOLD[i], Key::from(k)).unwrap();
+            i += 1;
+        }
+        for k in 0..7{
+            sensor_two.sensor.set_negative_threshold(THRESHOLD[i], Key::from(k)).unwrap();
+            i += 1;
+        }
+        for k in 0..3{
+            sensor_three.sensor.set_negative_threshold(THRESHOLD[i], Key::from(k)).unwrap();
+            i += 1;
+        }
+
         //Use previously created timer to trigger TIM3 Interrupt every milli second
         timer.listen(timer::Event::TimeOut);
 
