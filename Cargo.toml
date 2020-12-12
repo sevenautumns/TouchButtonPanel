@@ -5,13 +5,17 @@ authors = ["Sven Friedrich <friedrich122112@googlemail.com>"]
 edition = "2018"
 
 [dependencies]
-stm32f4xx-hal = { version = "0.8.3", features = ["rt", "stm32f401", "usb_fs"] }
-cortex-m = "0.6.3"
-cortex-m-rt = { version = "0.6.12", features = ["device"] }
-panic-halt = "0.2.0"
+stm32f4xx-hal = { version = "0.8.3", features = ["rt", "stm32f446"] }
+cortex-m = "0.6.4"
+cortex-m-rt = { version = "0.6.13", features = ["device"] }
 cortex-m-rtic = "0.5.5"
 embedded-hal = "0.2.4"
-usb-device = "0.2.5"
-at42qt1070 = "0.1.1"
+vl53l0x = "0.3.1"
 nb = "1.0.0"
-panic-semihosting = "0.5.3"
+panic-halt = "0.2.0"
+rtt-target = { version = "*", features = ["cortex-m"], optional = true }
+
+
+[features]
+default = [ "rtt" ]
+rtt = [ "rtt-target" ]
