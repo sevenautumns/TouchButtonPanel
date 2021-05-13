@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a2f58b0bb10c380af2b26e57212856b8c9a59e0925b4c20f4a174a49734eaf7"
+
+[[package]]
 name = "as-slice"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19,15 +25,6 @@ dependencies = [
  "generic-array 0.13.3",
  "generic-array 0.14.4",
  "stable_deref_trait",
-]
-
-[[package]]
-name = "at42qt1070"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9660ed537f0ea8e118793cc71677f75f6393e4e15a867ca1f6c86564ecff0319"
-dependencies = [
- "embedded-hal",
 ]
 
 [[package]]
@@ -391,6 +388,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
+name = "shared-bus-rtic"
+version = "0.2.2"
+source = "git+https://github.com/ryan-summers/shared-bus-rtic#f6a2b44c00101e1cb1d5de2e4bfefd5e95ec22dd"
+dependencies = [
+ "embedded-hal",
+ "nb 1.0.0",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -454,7 +460,7 @@ dependencies = [
 name = "touch_button_panel"
 version = "0.1.0"
 dependencies = [
- "at42qt1070",
+ "arrayvec",
  "cortex-m 0.7.2",
  "cortex-m-rt",
  "cortex-m-rtic",
@@ -463,6 +469,7 @@ dependencies = [
  "panic-halt",
  "panic-semihosting",
  "rtt-target",
+ "shared-bus-rtic",
  "stm32f4xx-hal",
  "usb-device",
  "vl53l0x",
@@ -506,9 +513,7 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 
 [[package]]
 name = "vl53l0x"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c1bba9fcd5f4a82c1cf37180c7784289471325fff64eca24f9da3549f99fe17"
+version = "0.3.2-alpha.0"
 dependencies = [
  "cast",
  "embedded-hal",

@@ -12,12 +12,15 @@ panic-halt = "0.2.0"
 cortex-m-rtic = "0.5.6"
 embedded-hal = "0.2.4"
 usb-device = "0.2.8"
-at42qt1070 = "0.1.1"
 nb = "1.0.0"
 panic-semihosting = "0.5.3"
-vl53l0x = "0.3.1"
+arrayvec = { version = "0.7.0", default-features = false }
+vl53l0x = {path = "../vl53l0x"}
 rtt-target = { version = "*", features = ["cortex-m"], optional = true }
 
+[dependencies.shared-bus-rtic]
+git = "https://github.com/ryan-summers/shared-bus-rtic"
+features = []
 
 [features]
 default = [ "rtt" ]
